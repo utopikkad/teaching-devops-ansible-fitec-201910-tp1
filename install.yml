@@ -1,0 +1,68 @@
+# vim: set ts=2 sw=2 et:
+ 
+- hosts: all
+  tasks: []
+
+- hosts: wiki
+  tasks: 
+    - name: Install apache and php
+      apt: 
+        name: ['apache2', 'php7.3']
+        state: present
+
+    - name: Download dokuwiki archive
+      get_url: 
+        url: https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz 
+        dest: /usr/src/dokuwiki-stable.tgz
+      delegate_to: control 
+
+    - name: Ensure dokuwiki directory exists
+      file: 
+        path: /usr/src/dokuwiki
+        state: directory
+
+    - name: Unzip dokuwiki archive
+      unarchive: 
+        src: /usr/src/dokuwiki-stable.tgz
+        dest: /usr/src/dokuwiki
+        extra_opts:
+          - --strip-components=1
+
+    - name: Create a directory for virtualhost data
+      file:
+        path: "/var/www/{{ item.dns }}"
+        state: directory
+      with_items: "{{ apache_virtual_hosts }}"
+
+    - name: Synchronize dokuwiki source to /var/www/X
+      synchronize:
+        src: /usr/src/dokuwiki/
+        dest: "/var/www/{{ item.dns }}/"
+      with_items: "{{ apache_virtual_hosts }}"
+      delegate_to: "{{ inventory_hostname }}"
+
+    - name: Ensure correct permissions
+      file:
+        path: "/var/www/{{ item.dns }}/"
+        owner: www-data
+        group: www-data
+      with_items: "{{ apache_virtual_hosts }}"
+
+    - name: Create Virtualhost configuration
+      template:
+        src: etc.apache2.sites-available.item.conf.j2
+        dest: "/etc/apache2/sites-available/{{ item.dns }}.conf"
+      with_items: "{{ apache_virtual_hosts }}"
+
+    - name: Enable site
+      command: "a2ensite {{ item.dns }}"
+      with_items: "{{ apache_virtual_hosts }}"
+
+    - name: Restart apache
+      service:
+        name: apache2
+        state: restarted
+
+   
+
+ #     shell: wget -O /usr/src/dokuwiki.tgz  

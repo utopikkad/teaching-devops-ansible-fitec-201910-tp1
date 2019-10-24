@@ -1,0 +1,5 @@
+
+apache_virtual_hosts:
+  - dns: politique.wiki
+  - dns: recettes.wiki
+
